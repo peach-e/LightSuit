@@ -80,8 +80,11 @@ void LevelAnalyzer::getRgbFromBuckets(int rgb[], int buckets[]) {
         switch (channel) {
         case 0:
         case 1:
-        case 2:
             Rt += 0.9 * logLevel;
+            break;
+        case 2:
+            Rt += 0.8 * logLevel;
+            Gt += 0.5 * logLevel;
             break;
         case 3:
         case 4:
