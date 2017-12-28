@@ -38,8 +38,9 @@
 #define R_MAX_MIN 0.999
 
 // High and low cutoff for throttling back the envelope on quiet notes.
-#define CUTOFF_A 0.45
-#define CUTOFF_B 0.1
+// Note that these are multiplied by the total allocation for each color before cutting.
+#define CUTOFF_A 0.22
+#define CUTOFF_B 0.05
 
 // Maximum gain after normalization.
 #define MAX_GAIN 270
@@ -58,7 +59,7 @@
  */
 
 // Bin to Color allocation.
-double RLevels[] = { 0.9, 0.9, 0.8, 0, 0, 0, 0 };
+double RLevels[] = { 1, 1, 0.8, 0, 0, 0, 0 };
 double GLevels[] = { 0, 0, 0.5, 1, 1, 0, 0 };
 double BLevels[] = { 0, 0, 0, 0, 0, 1, 1 };
 
@@ -66,6 +67,16 @@ double BLevels[] = { 0, 0, 0, 0, 0, 1, 1 };
  * Public Functions
  */
 LevelAnalyzer::LevelAnalyzer() {
+
+    _totalAllocation[CHANNEL_R] = 0;
+    _totalAllocation[CHANNEL_G] = 0;
+    _totalAllocation[CHANNEL_B] = 0;
+    for (int channel = 0; channel < NUM_FREQUENCY_BINS; channel++) {
+        _totalAllocation[CHANNEL_R] += RLevels[channel];
+        _totalAllocation[CHANNEL_G] += GLevels[channel];
+        _totalAllocation[CHANNEL_B] += BLevels[channel];
+    }
+
     reset();
 }
 
@@ -134,18 +145,21 @@ int LevelAnalyzer::_processChannel(const int channel, double Xt) {
     // 2. Create a multiplication envelope to stamp out quiet sounds and correctly scale loud ones.
     // 3. Scale from 0 to 255.
 
-    double slope = (1 / CUTOFF_A) / (CUTOFF_A - CUTOFF_B);
-    double b = -slope * CUTOFF_B;
+    double channelCutoffA = CUTOFF_A * _totalAllocation[channel];
+    double channelCutoffB = CUTOFF_B * _totalAllocation[channel];
+
+    double slope = (1 / channelCutoffA) / (channelCutoffA - channelCutoffB);
+    double b = -slope * channelCutoffB;
 
     // Keep the positive xSmooth.
     double xNormalized = xSmooth1 > 0 ? xSmooth1 : 0;
 
     // Establish the envelope.
     double xEnvelope = 0;
-    if (xMax < CUTOFF_B) {
+    if (xMax < channelCutoffB) {
         // Zero out result
         xEnvelope = 0;
-    } else if (xMax < CUTOFF_A) {
+    } else if (xMax < channelCutoffA) {
         // xMax is on thin ice, so we reduce its amplitude.
         xEnvelope = slope * xMax + b;
     } else {
