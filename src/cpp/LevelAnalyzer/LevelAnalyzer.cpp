@@ -52,6 +52,16 @@
 #define CHANNEL_G 1
 #define CHANNEL_B 2
 
+
+/*
+ * Constants
+ */
+
+// Bin to Color allocation.
+double RLevels[] = { 0.9, 0.9, 0.8, 0, 0, 0, 0 };
+double GLevels[] = { 0, 0, 0.5, 1, 1, 0, 0 };
+double BLevels[] = { 0, 0, 0, 0, 0, 1, 1 };
+
 /*
  * Public Functions
  */
@@ -77,24 +87,9 @@ void LevelAnalyzer::getRgbFromBuckets(int rgb[], int buckets[]) {
         logLevel = _fastLog(buckets[channel]);
 
         // Allocate the value to the RGB channels.
-        switch (channel) {
-        case 0:
-        case 1:
-            Rt += 0.9 * logLevel;
-            break;
-        case 2:
-            Rt += 0.8 * logLevel;
-            Gt += 0.5 * logLevel;
-            break;
-        case 3:
-        case 4:
-            Gt += logLevel;
-            break;
-        case 5:
-        case 6:
-        default:
-            Bt += logLevel;
-        }
+        Rt += RLevels[channel] * logLevel;
+        Gt += GLevels[channel] * logLevel;
+        Bt += BLevels[channel] * logLevel;
     }
 
     rgb[CHANNEL_R] = _processChannel(CHANNEL_R, Rt);
@@ -177,8 +172,13 @@ int LevelAnalyzer::_clamp(const double inputValue, const int lower,
     return result;
 }
 
-// Fast log function uses three quadratic polynomials in different parts of the domain
-// to kind-of fit the log curve on 0 - 1024.
+/*
+ * The fast log function uses three quadratic polynomials in different parts of the domain
+ * the to kind-of fit the log curve on 0 - 1024.
+ *
+ * This is definitely NOT a true log(X) function, but it gives us a good ballpark for what
+ * we're using it for (e.g. brightness of light).
+ */
 double LevelAnalyzer::_fastLog(const int & x) {
     double result = 0;
     double a;
