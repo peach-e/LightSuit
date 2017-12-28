@@ -12,9 +12,9 @@
 /*
  * To do smoothing, we're using a single-pole falloff to smooth out a signal.
  * E.g, the unit impulse response for any signal we "smooth" is an exponential decay
- * with a setting time of either 5s, 2s or 0.3s.
+ * with a given setting time.
  *
- * The formula is this:
+ * The formula looks like this:
  *
  *     0.02 = R ** NS
  *
@@ -27,6 +27,25 @@
  * NS = <settling time> / <iteration period>
  * R  = 0.02 ** (1/NS)
  */
+
+// Smoothing amount to calculate running average.
+#define R_AVG 0.995
+
+// Initial Smoothing.
+#define R_S1 0.85
+
+// Smoothing amount for finding maximum signal level.
+#define R_MAX_MIN 0.999
+
+// High and low cutoff for throttling back the envelope on quiet notes.
+#define CUTOFF_A 0.45
+#define CUTOFF_B 0.1
+
+// Maximum gain after normalization.
+#define MAX_GAIN 270
+
+// Smoothing amount after normalization.
+#define R_S2 0.9
 
 // Shortcut for channel holders.
 #define CHANNEL_R 0
@@ -60,13 +79,9 @@ void LevelAnalyzer::getRgbFromBuckets(int rgb[], int buckets[]) {
         // Allocate the value to the RGB channels.
         switch (channel) {
         case 0:
-            Rt += 1.5 * logLevel;
-            break;
         case 1:
-            Rt += logLevel;
-            break;
         case 2:
-            Rt += 0.5 * logLevel;
+            Rt += 0.9 * logLevel;
             break;
         case 3:
         case 4:
@@ -94,7 +109,6 @@ void LevelAnalyzer::reset() {
         _xS1[i] = 0;
         _xS2[i] = 0;
         _xMax[i] = 0;
-        _xMin[i] = 0;
     }
 }
 
@@ -104,54 +118,51 @@ void LevelAnalyzer::reset() {
 int LevelAnalyzer::_processChannel(const int channel, double Xt) {
     int result = 0;
 
-    // Subtract the null offset
-#define NULL_OFFSET_R 6.75
-#define NULL_OFFSET_G 4.5
-#define NULL_OFFSET_B 3.8
+    // Get the average by smoothing long-time.
+    double & xAverage = _xAverage[channel];
+    _smooth(Xt, xAverage, R_AVG);
 
-    Xt -= channel == CHANNEL_R ? NULL_OFFSET_R :
-          channel == CHANNEL_G ? NULL_OFFSET_G : NULL_OFFSET_B;
-
-    // Smooth
-#define R_S1 0.85
+    // Subtract the average from the value and smooth to get the zero-centered,
+    // smoothed value.
     double & xSmooth1 = _xS1[channel];
-    _smooth(Xt, xSmooth1, R_S1);
+    _smooth(Xt - xAverage, xSmooth1, R_S1);
 
-#define MULT_R 5
-#define MULT_G 2
-#define MULT_B 1
-
-    double multiplier = channel == CHANNEL_R ? MULT_R :
-                        channel == CHANNEL_G ? MULT_G : MULT_B;
-    Xt = xSmooth1 * multiplier;
-    // Subtract the noise offset.
-#define NOISE_OFFSET 1
-    Xt -= NOISE_OFFSET;
-
-    Xt = Xt < 0 ? 0 : Xt;
-
-    // Get the maximum.
-#define R_MAX_MIN 0.999
+    // Get the maximum value of the smoothed signal
     double & xMax = _xMax[channel];
-    double & xMin = _xMin[channel];
     xMax = xSmooth1 > xMax ? xSmooth1 : xMax * R_MAX_MIN;
-    xMin = 0;    //xSmooth1 < xMin ? xSmooth1 : xMin * R_MAX_MIN;
 
-    // If there's a max, scale to meet it.
-    if (xMax > 0) {
-        Xt = Xt / xMax;
+    // Normalize in three steps:
+    // 1. Discard all values in the signal that are negative. The positive loudness seems to be AC coupled.
+    // 2. Create a multiplication envelope to stamp out quiet sounds and correctly scale loud ones.
+    // 3. Scale from 0 to 255.
+
+    double slope = (1 / CUTOFF_A) / (CUTOFF_A - CUTOFF_B);
+    double b = -slope * CUTOFF_B;
+
+    // Keep the positive xSmooth.
+    double xNormalized = xSmooth1 > 0 ? xSmooth1 : 0;
+
+    // Establish the envelope.
+    double xEnvelope = 0;
+    if (xMax < CUTOFF_B) {
+        // Zero out result
+        xEnvelope = 0;
+    } else if (xMax < CUTOFF_A) {
+        // xMax is on thin ice, so we reduce its amplitude.
+        xEnvelope = slope * xMax + b;
+    } else {
+        xEnvelope = 1 / xMax;
     }
 
-    // Smooth again.
+    // Multiply 'em and set the value of 'max'.
+    Xt = xNormalized * xEnvelope * MAX_GAIN;
+
+    // Smooth the resulting value.
     double & xSmooth2 = _xS2[channel];
-#define R_S2 0.997
     _smooth(Xt, xSmooth2, R_S2);
 
-    // Scale up to 255.
-    Xt *= 255.0;
-
     // Clamp the value between 0 and 255 as an integer.
-    result = _clamp(Xt, 1, 255);
+    result = _clamp(xSmooth2, 1, 255);
     return result;
 }
 

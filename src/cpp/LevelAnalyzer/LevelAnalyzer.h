@@ -28,9 +28,6 @@ private:
     // Running Maximum
     double _xMax[3];
 
-    // Running Minimum
-    double _xMin[3];
-
     /*
      *
      * Processes a single channel in R,G,B.
