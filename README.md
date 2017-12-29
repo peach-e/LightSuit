@@ -55,3 +55,12 @@ analysis  README.md  src
 ### Deployment to Eclipse
 
 Please wait until I've tried it before I try to explain how...
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details
+
+## Acknowledgements
+
+* Thanks to my colleagues who patiently let me bounce ideas around and ask obvious C++ questions as I try to pick up a new language!
+
