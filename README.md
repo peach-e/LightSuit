@@ -25,6 +25,7 @@ For deployment to Arduino:
 
 For development on Eclipse:
 * Recommended: Debian-based Linux Operating System
+* Recommended: Python3, iPython and SciPy
 * A working deployment of the Eclipse CDT (https://www.eclipse.org/cdt/)
 * A Recent version of the Arduino IDE (https://www.arduino.cc/en/Main/Software)
 
@@ -53,4 +54,4 @@ analysis  README.md  src
 
 ### Deployment to Eclipse
 
-Please wait until I've tried it before I tell exactly how.
+Please wait until I've tried it before I try to explain how...
