@@ -16,6 +16,12 @@
 
 class LevelAnalyzer {
 private:
+
+    // Total allocation of bins to each channel.
+    // e.g If each of the 7 bins was multiplied by 0.5 and added to Green,
+    // Green would have 3.5.
+    double _totalAllocation[3];
+
     // Average values of input
     double _xAverage[3];
 
@@ -27,9 +33,6 @@ private:
 
     // Running Maximum
     double _xMax[3];
-
-    // Running Minimum
-    double _xMin[3];
 
     /*
      *
